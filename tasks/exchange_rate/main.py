@@ -15,6 +15,13 @@ mse_list = []
 if __name__ == '__main__':
     mse_list = []
     for train_x, train_y, test_x, test_y in folds:
+        print("sfsdf")
+        print(len(train_x[0]))
+        print(type(train_y))
+        print(train_y[:,0])
+        print(test_x.shape[1])
+        # exit()
+
         model = compiled_tcn(return_sequences=False,
                              num_feat=test_x.shape[1],
                              nb_filters=24,
@@ -26,9 +33,11 @@ if __name__ == '__main__':
                              use_skip_connections=True,
                              regression=True,
                              dropout_rate=0,
-                             output_len=test_y.shape[0])
-        model.fit(train_x, train_y, batch_size=256, epochs=100)
+                             output_len=1)
+        model.fit(train_x, train_y[:,0], batch_size=256, epochs=100)
         y_raw_pred = model.predict(np.array([test_x]))
+        print(y_raw_pred)
+        exit()
         y_pred = enc.inverse_transform(y_raw_pred).flatten()
         y_true = enc.inverse_transform([test_y]).flatten()
         mse_cur = mean_squared_error(y_true, y_pred)

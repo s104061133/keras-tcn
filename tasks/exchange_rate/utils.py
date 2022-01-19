@@ -14,11 +14,18 @@ def get_xy_kfolds(split_index=[0.5, 0.6, 0.7, 0.8, 0.9], timesteps=1000):
     folds = []
     enc = MinMaxScaler()
     df = enc.fit_transform(df)
+    print("asdasd")
+    print(n)
+    print(df)
+    # exit()
     for split_point in split_index:
         train_end = int(split_point * n)
         train_x, train_y = [], []
         for i in range(train_end - timesteps):
+            # print(df[i:i + timesteps])
             train_x.append(df[i:i + timesteps])
+            # print(df[i + timesteps])
+            # exit()
             train_y.append(df[i + timesteps])
         train_x = np.array(train_x)
         train_y = np.array(train_y)

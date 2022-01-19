@@ -6,6 +6,8 @@ from tcn import compiled_tcn
 def run_task():
     (x_train, y_train), (x_test, y_test) = data_generator()
 
+
+
     model = compiled_tcn(return_sequences=False,
                          num_feat=1,
                          num_classes=10,

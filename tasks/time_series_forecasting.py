@@ -17,6 +17,7 @@ from tcn import TCN
 milk = pd.read_csv('monthly-milk-production-pounds-p.csv', index_col=0, parse_dates=True)
 
 print(milk.head())
+exit()
 
 lookback_window = 12  # months.
 

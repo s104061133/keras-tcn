@@ -7,6 +7,10 @@ from tcn import compiled_tcn, tcn_full_summary
 x_train, y_train = data_generator(n=200000, seq_length=600)
 x_test, y_test = data_generator(n=40000, seq_length=600)
 
+# print(x_train[0])
+# print(x_train.shape[2])
+# print(y_train[0])
+# exit()
 
 class PrintSomeValues(Callback):
 
