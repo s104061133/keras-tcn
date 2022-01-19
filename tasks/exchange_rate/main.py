@@ -33,11 +33,14 @@ if __name__ == '__main__':
                              use_skip_connections=True,
                              regression=True,
                              dropout_rate=0,
-                             output_len=1)
-        model.fit(train_x, train_y[:,0], batch_size=256, epochs=100)
+                             output_len=test_y.shape[0])
+        model.fit(train_x, train_y[:,0], batch_size=256, epochs=20)
         y_raw_pred = model.predict(np.array([test_x]))
+
+        y_true = enc.inverse_transform([test_y]).flatten()
         print(y_raw_pred)
-        exit()
+        print(y_true)
+        # exit()
         y_pred = enc.inverse_transform(y_raw_pred).flatten()
         y_true = enc.inverse_transform([test_y]).flatten()
         mse_cur = mean_squared_error(y_true, y_pred)

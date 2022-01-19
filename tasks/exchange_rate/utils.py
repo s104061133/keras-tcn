@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 
 
-def get_xy_kfolds(split_index=[0.5, 0.6, 0.7, 0.8, 0.9], timesteps=1000):
+def get_xy_kfolds(split_index=[0.5, 0.6, 0.7, 0.8, 0.9], timesteps=900):
     """
     load exchange rate dataset and preprecess it, then split it into k-folds for CV
     :param split_index: list, the ratio of whole dataset as train set
