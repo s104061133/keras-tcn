@@ -1,0 +1,221 @@
+#!/usr/bin/python
+# -*- coding: UTF-8 -*-
+import copy
+import sys
+import numpy as np
+import pandas as pd
+import re
+import math
+from datetime import datetime
+import datetime as DateTime
+import os
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+from joblib import dump, load
+
+class StockProcess:
+    CONST_INIT_DATE = "20040102"
+    CONST_END_DATE = "20211128"
+    EXLUDE_STOCKNUM = ['2823', '912398', '3095', '3144', '4803']
+    highDf = []
+    highCurrent = None
+    lowDf = []
+    lowCurrent = None
+    volumnDf = []
+    volumnCurrent = None
+    dateCurrent = None
+    stockNumCurrent = None
+    stockTokenDf=[]
+    stockTokenBuyCurrent=None
+    stockTokenBuyPrev=None
+    stockTokenSellCurrent=None
+    stockTokenSellPrev=None
+    df=None
+    def __init__(self):
+        high = pd.read_csv("./data/2003-2021high.csv")
+        high = high.loc[:, ~high.columns.str.contains('^Unnamed')]
+        high = high.set_axis(high.iloc[3].tolist(), axis=1)
+        high = high.drop([0, 1, 2, 3])
+        high.index = high[high.columns[0]].astype(str)
+        high = high.drop('股票代號', 1)
+        column = high.columns.tolist()
+        for i in range(len(column)):
+            column[i] = column[i].replace('最高價', '')
+        high.columns = column
+        low = pd.read_csv("./data/2003-2021low.csv")
+        low = low.loc[:, ~low.columns.str.contains('^Unnamed')]
+        low = low.set_axis(low.iloc[3].tolist(), axis=1)
+        low = low.drop([0, 1, 2, 3])
+        low.index = low[low.columns[0]].astype(str)
+        low = low.drop('股票代號', 1)
+        column = low.columns.tolist()
+        for i in range(len(column)):
+            column[i] = column[i].replace('最低價', '')
+        low.columns = column
+        volumn = pd.read_csv("./data/2003-2021volumn.csv")
+        volumn = volumn.loc[:, ~volumn.columns.str.contains('^Unnamed')]
+        volumn = volumn.set_axis(volumn.iloc[3].tolist(), axis=1)
+        volumn = volumn.drop([0, 1, 2, 3])
+        volumn.index = volumn[volumn.columns[0]].astype(str)
+        volumn = volumn.drop('股票代號', 1)
+        column = volumn.columns.tolist()
+        for i in range(len(column)):
+            column[i] = column[i].replace('成交金額(千)', '')
+        volumn.columns = column
+        self.highDf = high
+        self.lowDf = low
+        self.volumnDf = volumn
+        self.dateCurrent = self.CONST_INIT_DATE
+        self.stockNumCurrent = high.index[0]
+        # self.setCurrentData(self.stockNumCurrent, self.dateCurrent)
+    def prevDayBuy(self,day):
+        total=0
+        # print(self.token.index.get_loc(self.currentDateIndex))
+        # print((self.currentDateIndex))
+        # exit()
+        for i in  range(day):
+            try:
+                if float(self.stockTokenDf.loc[self.stockTokenDf.index[self.stockTokenDf.index.get_loc(self.dateCurrent) + i],'近1日買超合計'])>float(self.stockTokenDf.loc[self.stockTokenDf.index[self.stockTokenDf.index.get_loc(self.dateCurrent) +1+ i],'近1日賣超合計']):
+                    total+=1
+                else:
+                    total-=1
+            except IndexError:
+                return 0
+        return total
+
+    def setCurrentData(self, stockNum, date):
+        self.highCurrent = float(self.highDf.loc[stockNum, date])
+        self.lowCurrent = float(self.lowDf.loc[stockNum, date])
+        self.volumnCurrent = float(self.volumnDf.loc[stockNum, date])
+        self.stockTokenBuyCurrent = float(self.stockTokenDf.loc[date,'近1日買超合計'])
+        self.stockTokenSellCurrent = float(self.stockTokenDf.loc[date,'近1日賣超合計'])
+        self.stockTokenBuyPrev = float(self.stockTokenDf.loc[self.stockTokenDf.index[self.stockTokenDf.index.get_loc(date) + 1], '近1日買超合計'])
+        self.stockTokenSellPrev = float(self.stockTokenDf.loc[self.stockTokenDf.index[self.stockTokenDf.index.get_loc(date) + 1], '近1日賣超合計'])
+        self.dateCurrent = date
+        self.stockNumCurrent = stockNum
+
+    def moveNextDate(self):
+        try:
+            self.dateCurrent = self.stockTokenDf.index[self.stockTokenDf.index.get_loc(self.dateCurrent) - 1]
+            # print(self.dateCurrent)
+            # exit()
+            self.setCurrentData(self.stockNumCurrent, self.dateCurrent)
+            return True
+        except IndexError:
+            return False
+
+    def moveNextRow(self):
+        try:
+            self.stockNumCurrent = self.stockTokenDf.index[self.stockTokenDf.index.get_loc(self.stockNumCurrent) + 1]
+            if self.stockNumCurrent in self.EXLUDE_STOCKNUM:
+                return self.moveNextRow()
+            self.dateCurrent = self.CONST_INIT_DATE
+            self.setCurrentData(self.stockNumCurrent, self.dateCurrent)
+            return True
+        except IndexError:
+            return False
+        # except KeyError:
+        #     return self.moveNextStock()
+
+    def moveNextStock(self, date):
+        try:
+            self.stockNumCurrent = self.stockTokenDf.index[self.stockTokenDf.index.get_loc(self.stockNumCurrent) + 1]
+            if self.stockNumCurrent in self.EXLUDE_STOCKNUM:
+                return self.moveNextStock(date)
+            self.setCurrentData(self.stockNumCurrent, date)
+            return True
+        except IndexError:
+            return False
+
+    def moveNext(self):
+        if self.moveNextDate():
+            return "nextDate"
+        # elif self.moveNextRow():
+        #     return "nextStock"
+        else:
+            return "EOF"
+
+    def label(self,i):
+        maxPrice=self.df[i][2]
+        minPrice=self.df[i][3]
+        for index in range(60):
+            if self.df[i+index][2]>maxPrice:
+                maxPrice=self.df[i+index][2]
+            if self.df[i + index][3] < minPrice:
+                minPrice=self.df[i + index][3]
+        maxPrice=(maxPrice-self.df[i-1][2])/self.df[i-1][2]
+        minPrice=(minPrice-self.df[i-1][2])/self.df[i-1][2]
+        return  [maxPrice,minPrice]
+        print(self.df[i])
+        print(self.df[i][2])
+        exit()
+        # max
+        # for day in range(60):
+        #
+        # self.df[i-1]=
+    def stockStrategy(self,stockNum,year,timesteps):
+        stockToken = pd.read_csv("./data/"+stockNum+"token.csv", encoding='big5')
+        stockToken = stockToken.loc[:, ~stockToken.columns.str.contains('^Unnamed')]
+        stockToken = stockToken.set_axis(stockToken.iloc[3].tolist(), axis=1)
+        stockToken = stockToken.drop([0, 1, 2, 3])
+        stockToken = stockToken[stockToken['近1日買超合計'].notna()]
+        for i in range(len(stockToken.index)):
+            dateArray = stockToken.loc[stockToken.index[i], '日期'].split('/')
+            dateArray = list(map(int, dateArray))
+            stockToken.loc[stockToken.index[i], '日期'] = datetime(dateArray[2], dateArray[0], dateArray[1]).date().strftime(
+                "%Y%m%d")
+        stockToken.index = stockToken['日期'].astype(str)
+        stockToken = stockToken.drop('日期', 1)
+        # 找出那一年有交易的第一天
+        dateTimeYear = datetime.strptime(str(int(year)-0), '%Y').date()
+        # print(dateTimeYear)
+        while True:
+            try:
+                # print(dateTimeYear.strftime("%Y%m%d"))
+                stockToken.index[stockToken.index.get_loc(dateTimeYear.strftime("%Y%m%d"))]
+                break
+            except:
+                dateTimeYear += DateTime.timedelta(days=1)
+        CurrentDate = dateTimeYear.strftime("%Y%m%d")
+        self.stockTokenDf=stockToken
+        # print(CurrentDate)
+        self.setCurrentData(stockNum,CurrentDate)
+        df=[]
+        date=[]
+        while True:
+            df.append([float(self.stockTokenBuyCurrent)-float(self.stockTokenSellCurrent),
+                       float(self.stockTokenBuyCurrent)+float(self.stockTokenSellCurrent),
+                       self.highCurrent,
+                       self.lowCurrent,
+                       self.volumnCurrent])
+            date.append(self.dateCurrent)
+            # print(self.dateCurrent)
+            if int(self.dateCurrent[0:4])>int(year) or int(self.dateCurrent)>int(self.CONST_END_DATE):
+                break
+            # if self.prevDayBuy(10)<-4 and self.stockTokenBuyCurrent>self.stockTokenSellCurrent:
+            #     print(self.dateCurrent)
+            self.moveNext()
+        self.df=df
+        train_end =len(df)
+        train_x=[]
+        train_y=[]
+        enc = MinMaxScaler()
+        enc.fit(df)
+        dump(enc, "./output/scaler.save")
+        for i in range(train_end - timesteps-60):
+            train_x.append(enc.transform(self.df[i:i + timesteps]))
+            train_y.append(self.label(i + timesteps))
+        print(train_x[0])
+        print(train_y[0])
+        # print(df)
+        print((date[timesteps]))
+        print(len(date))
+        # enc = MinMaxScaler()
+        # enc.fit(df)
+        # train_x=enc.transform(train_x)
+        # print(train_x)
+        # dump(enc, "./output/scaler.save")
+        # print(df)
+
+StockProcess=StockProcess()
+StockProcess.stockStrategy(sys.argv[1],sys.argv[2],int(sys.argv[3]))
