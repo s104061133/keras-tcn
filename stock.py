@@ -12,6 +12,7 @@ import os
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from joblib import dump, load
+from tcn import compiled_tcn
 
 class StockProcess:
     CONST_INIT_DATE = "20040102"
@@ -31,6 +32,7 @@ class StockProcess:
     stockTokenSellCurrent=None
     stockTokenSellPrev=None
     df=None
+    date=None
     def __init__(self):
         high = pd.read_csv("./data/2003-2021high.csv")
         high = high.loc[:, ~high.columns.str.contains('^Unnamed')]
@@ -143,8 +145,8 @@ class StockProcess:
                 maxPrice=self.df[i+index][2]
             if self.df[i + index][3] < minPrice:
                 minPrice=self.df[i + index][3]
-        maxPrice=(maxPrice-self.df[i-1][2])/self.df[i-1][2]
-        minPrice=(minPrice-self.df[i-1][2])/self.df[i-1][2]
+        maxPrice=(maxPrice-self.df[i][2])/self.df[i][2]
+        minPrice=(minPrice-self.df[i][2])/self.df[i][2]
         return  [maxPrice,minPrice]
         print(self.df[i])
         print(self.df[i][2])
@@ -153,6 +155,37 @@ class StockProcess:
         # for day in range(60):
         #
         # self.df[i-1]=
+    def tradeDateByYear(self,year):
+        dateTimeYear = datetime.strptime(str(int(year) - 0), '%Y').date()
+        print(dateTimeYear)
+        while True:
+            try:
+                # print(dateTimeYear.strftime("%Y%m%d"))
+                self.stockTokenDf.index[self.stockTokenDf.index.get_loc(dateTimeYear.strftime("%Y%m%d"))]
+                break
+            except:
+                dateTimeYear += DateTime.timedelta(days=1)
+        CurrentDate = dateTimeYear.strftime("%Y%m%d")
+        return CurrentDate
+    def setDf(self,stockNum,CurrentDate,year):
+        self.setCurrentData(stockNum, CurrentDate)
+        df = []
+        date = []
+        while True:
+            df.append([float(self.stockTokenBuyCurrent) - float(self.stockTokenSellCurrent),
+                       float(self.stockTokenBuyCurrent) + float(self.stockTokenSellCurrent),
+                       self.highCurrent,
+                       self.lowCurrent,
+                       self.volumnCurrent])
+            date.append(self.dateCurrent)
+            # print(self.dateCurrent)
+            if int(self.dateCurrent[0:4]) > int(year)+1 or int(self.dateCurrent) > int(self.CONST_END_DATE):
+                break
+            # if self.prevDayBuy(10)<-4 and self.stockTokenBuyCurrent>self.stockTokenSellCurrent:
+            #     print(self.dateCurrent)
+            self.moveNext()
+        self.df = df
+        self.date = date
     def stockStrategy(self,stockNum,year,timesteps):
         stockToken = pd.read_csv("./data/"+stockNum+"token.csv", encoding='big5')
         stockToken = stockToken.loc[:, ~stockToken.columns.str.contains('^Unnamed')]
@@ -166,50 +199,101 @@ class StockProcess:
                 "%Y%m%d")
         stockToken.index = stockToken['日期'].astype(str)
         stockToken = stockToken.drop('日期', 1)
+        self.stockTokenDf = stockToken
         # 找出那一年有交易的第一天
-        dateTimeYear = datetime.strptime(str(int(year)-0), '%Y').date()
-        # print(dateTimeYear)
-        while True:
-            try:
-                # print(dateTimeYear.strftime("%Y%m%d"))
-                stockToken.index[stockToken.index.get_loc(dateTimeYear.strftime("%Y%m%d"))]
-                break
-            except:
-                dateTimeYear += DateTime.timedelta(days=1)
-        CurrentDate = dateTimeYear.strftime("%Y%m%d")
-        self.stockTokenDf=stockToken
-        # print(CurrentDate)
-        self.setCurrentData(stockNum,CurrentDate)
-        df=[]
-        date=[]
-        while True:
-            df.append([float(self.stockTokenBuyCurrent)-float(self.stockTokenSellCurrent),
-                       float(self.stockTokenBuyCurrent)+float(self.stockTokenSellCurrent),
-                       self.highCurrent,
-                       self.lowCurrent,
-                       self.volumnCurrent])
-            date.append(self.dateCurrent)
-            # print(self.dateCurrent)
-            if int(self.dateCurrent[0:4])>int(year) or int(self.dateCurrent)>int(self.CONST_END_DATE):
-                break
-            # if self.prevDayBuy(10)<-4 and self.stockTokenBuyCurrent>self.stockTokenSellCurrent:
-            #     print(self.dateCurrent)
-            self.moveNext()
-        self.df=df
-        train_end =len(df)
+        CurrentDate = self.tradeDateByYear(year)
+        self.setDf(stockNum,CurrentDate,year)
+
+        # self.setCurrentData(stockNum,CurrentDate)
+        # df=[]
+        # date=[]
+        # while True:
+        #     df.append([float(self.stockTokenBuyCurrent)-float(self.stockTokenSellCurrent),
+        #                float(self.stockTokenBuyCurrent)+float(self.stockTokenSellCurrent),
+        #                self.highCurrent,
+        #                self.lowCurrent,
+        #                self.volumnCurrent])
+        #     date.append(self.dateCurrent)
+        #     # print(self.dateCurrent)
+        #     if int(self.dateCurrent[0:4])>int(year) or int(self.dateCurrent)>int(self.CONST_END_DATE):
+        #         break
+        #     # if self.prevDayBuy(10)<-4 and self.stockTokenBuyCurrent>self.stockTokenSellCurrent:
+        #     #     print(self.dateCurrent)
+        #     self.moveNext()
+        # self.df=df
+        train_end =len(self.df)
         train_x=[]
         train_y=[]
         enc = MinMaxScaler()
-        enc.fit(df)
+        enc.fit(self.df)
         dump(enc, "./output/scaler.save")
         for i in range(train_end - timesteps-60):
             train_x.append(enc.transform(self.df[i:i + timesteps]))
             train_y.append(self.label(i + timesteps))
-        print(train_x[0])
-        print(train_y[0])
-        # print(df)
-        print((date[timesteps]))
-        print(len(date))
+        train_x = np.array(train_x)
+        train_y = np.array(train_y)
+
+        model = compiled_tcn(return_sequences=False,
+                             num_feat=train_x.shape[2],
+                             nb_filters=24,
+                             num_classes=0,
+                             kernel_size=8,
+                             dilations=[2 ** i for i in range(9)],
+                             nb_stacks=1,
+                             max_len=train_x.shape[1],
+                             use_skip_connections=True,
+                             regression=True,
+                             dropout_rate=0,
+                             output_len=train_y.shape[1])
+        # print(train_y)
+        # print(train_y[:, 0])
+        # exit()
+        model.fit(train_x, train_y, batch_size=100, epochs=100)
+        test_x = []
+        test_y = []
+        for i in range(train_end- timesteps-1,train_end- timesteps):
+            test_x.append(enc.transform(self.df[i:i + timesteps]))
+            # test_y.append(self.label(i + timesteps))
+        # print(test_x)
+        test_x = np.array(test_x)
+        y_raw_pred = model.predict(test_x)
+        # for i in range(y_raw_pred.shape[0]):
+        print("----------")
+        print(y_raw_pred)
+        # print(test_y[i])
+        print("----------")
+        print(train_y[len(train_y)-1])
+        exit()
+
+        year=int(year)+1
+        CurrentDate = self.tradeDateByYear(year)
+        print(CurrentDate)
+        exit()
+        self.setDf(stockNum, CurrentDate, year)
+
+        test_end = len(self.df)
+        test_x = []
+        test_y = []
+        enc = load('./output/scaler.save')
+        # enc = MinMaxScaler()
+        enc.fit(self.df)
+        # load('./output/scaler.save')
+        # dump(enc, "./output/scaler.save")
+        for i in range(test_end - timesteps - 60):
+            test_x.append(enc.transform(self.df[i:i + timesteps]))
+            test_y.append(self.label(i + timesteps))
+        test_x = np.array(test_x)
+        test_y = np.array(test_y)
+        y_raw_pred = model.predict(test_x)
+        for i in range(60,y_raw_pred.shape[0]):
+            print("==========")
+            print(y_raw_pred[i])
+            print(test_y[i])
+        # print(train_x[0])
+        # print(train_y[0])
+        # # print(df)
+        # print((date[timesteps]))
+        # print(len(date))
         # enc = MinMaxScaler()
         # enc.fit(df)
         # train_x=enc.transform(train_x)

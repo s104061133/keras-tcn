@@ -18,7 +18,7 @@ def get_xy_kfolds(split_index=[0.5, 0.6, 0.7, 0.8, 0.9], timesteps=900):
     print(n)
     print(df[0])
     print(df)
-    exit()
+    # exit()
     for split_point in split_index:
         train_end = int(split_point * n)
         train_x, train_y = [], []
