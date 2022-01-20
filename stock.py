@@ -31,8 +31,10 @@ class StockProcess:
     stockTokenBuyPrev=None
     stockTokenSellCurrent=None
     stockTokenSellPrev=None
-    df=None
+    df=[]
     date=None
+    labelDf=[]
+    timesteps=None
     def __init__(self):
         high = pd.read_csv("./data/2003-2021high.csv")
         high = high.loc[:, ~high.columns.str.contains('^Unnamed')]
@@ -138,16 +140,28 @@ class StockProcess:
             return "EOF"
 
     def label(self,i):
-        maxPrice=self.df[i][2]
-        minPrice=self.df[i][3]
+        ind=i+self.timesteps
+        maxPrice=self.df[ind][2]
+        minPrice=self.df[ind][3]
         for index in range(60):
-            if self.df[i+index][2]>maxPrice:
-                maxPrice=self.df[i+index][2]
-            if self.df[i + index][3] < minPrice:
-                minPrice=self.df[i + index][3]
-        maxPrice=(maxPrice-self.df[i][2])/self.df[i][2]
-        minPrice=(minPrice-self.df[i][2])/self.df[i][2]
-        return  [maxPrice,minPrice]
+            if self.df[ind+index][2]>maxPrice:
+                maxPrice=self.df[ind+index][2]
+            if self.df[ind + index][3] < minPrice:
+                minPrice=self.df[ind + index][3]
+        maxPrice=(maxPrice-self.df[ind][2])/self.df[ind][2]
+        minPrice=(minPrice-self.df[ind][2])/self.df[ind][2]
+        self.labelDf+=[[maxPrice,minPrice]]
+
+        # print(self.labelDf[i])
+        # print()
+        # exit()
+        try:
+            return  self.labelDf[i]
+        except:
+            print(i)
+            exit()
+
+
         print(self.df[i])
         print(self.df[i][2])
         exit()
@@ -179,14 +193,16 @@ class StockProcess:
                        self.volumnCurrent])
             date.append(self.dateCurrent)
             # print(self.dateCurrent)
-            if int(self.dateCurrent[0:4]) > int(year)+1 or int(self.dateCurrent) > int(self.CONST_END_DATE):
+            if int(self.dateCurrent[0:4]) > int(year) or int(self.dateCurrent) > int(self.CONST_END_DATE):
                 break
             # if self.prevDayBuy(10)<-4 and self.stockTokenBuyCurrent>self.stockTokenSellCurrent:
             #     print(self.dateCurrent)
             self.moveNext()
-        self.df = df
+        self.df += df
         self.date = date
     def stockStrategy(self,stockNum,year,timesteps):
+        self.timesteps=timesteps
+
         stockToken = pd.read_csv("./data/"+stockNum+"token.csv", encoding='big5')
         stockToken = stockToken.loc[:, ~stockToken.columns.str.contains('^Unnamed')]
         stockToken = stockToken.set_axis(stockToken.iloc[3].tolist(), axis=1)
@@ -227,9 +243,13 @@ class StockProcess:
         enc = MinMaxScaler()
         enc.fit(self.df)
         dump(enc, "./output/scaler.save")
+
+        # year=int(year)+1
+        # self.setDf(stockNum, CurrentDate, year)
+
         for i in range(train_end - timesteps-60):
             train_x.append(enc.transform(self.df[i:i + timesteps]))
-            train_y.append(self.label(i + timesteps))
+            train_y.append(self.label(i))
         train_x = np.array(train_x)
         train_y = np.array(train_y)
 
@@ -249,18 +269,22 @@ class StockProcess:
         # print(train_y[:, 0])
         # exit()
         model.fit(train_x, train_y, batch_size=100, epochs=100)
+        self.setDf(stockNum, CurrentDate, year)
+        test_end=len(self.df)
         test_x = []
         test_y = []
-        for i in range(train_end- timesteps-1,train_end- timesteps):
+        j=0
+        for i in range(train_end- timesteps-1,test_end- timesteps-60):
             test_x.append(enc.transform(self.df[i:i + timesteps]))
-            # test_y.append(self.label(i + timesteps))
+            test_y.append(self.label(train_end - timesteps-60+j))
+            j+=1
         # print(test_x)
         test_x = np.array(test_x)
         y_raw_pred = model.predict(test_x)
-        # for i in range(y_raw_pred.shape[0]):
-        print("----------")
-        print(y_raw_pred)
-        # print(test_y[i])
+        for i in range(y_raw_pred.shape[0]):
+            print("----------")
+            print(y_raw_pred[i])
+            print(test_y[i])
         print("----------")
         print(train_y[len(train_y)-1])
         exit()
@@ -281,7 +305,7 @@ class StockProcess:
         # dump(enc, "./output/scaler.save")
         for i in range(test_end - timesteps - 60):
             test_x.append(enc.transform(self.df[i:i + timesteps]))
-            test_y.append(self.label(i + timesteps))
+            test_y.append(self.label(i))
         test_x = np.array(test_x)
         test_y = np.array(test_y)
         y_raw_pred = model.predict(test_x)
