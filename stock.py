@@ -171,6 +171,23 @@ class StockProcess:
         # for day in range(60):
         #
         # self.df[i-1]=
+
+    def label2(self,i):
+        ind=i
+        maxPrice=self.df[ind][2]
+        minPrice=self.df[ind][3]
+        for index in range(self.exitTimes):
+            if self.df[ind+index][2]>maxPrice:
+                maxPrice=self.df[ind+index][2]
+            if self.df[ind + index][3] < minPrice:
+                minPrice=self.df[ind + index][3]
+        maxPrice=(maxPrice-self.df[ind][2])/self.df[ind][2]
+        minPrice=(minPrice-self.df[ind][2])/self.df[ind][2]
+        # self.labelDf+=[[maxPrice,minPrice]]
+        # print(self.df[ind][5])
+        # exit()
+        return [[maxPrice,minPrice,self.df[ind][5]]]
+
     def tradeDateByYear(self,year):
         dateTimeYear = datetime.strptime(str(int(year) - 0), '%Y').date()
         print(dateTimeYear)
@@ -246,6 +263,11 @@ class StockProcess:
         #     self.moveNext()
         # self.df=df
         train_end =len(self.df)
+
+        # print(self.df[train_end-1])
+        # print(train_end)
+        # exit()
+
         train_x=[]
         train_y=[]
         enc = MinMaxScaler()
@@ -280,14 +302,29 @@ class StockProcess:
         # print(train_y[:, 0])
         # exit()
         model.fit(train_x, train_y, batch_size=100, epochs=200)
+        year = int(year) + 1
+        CurrentDate = self.tradeDateByYear(year)
         self.setDf(stockNum, CurrentDate, year)
+
+        # print(self.df[train_end - 1])
+        # print(train_end)
+        # exit()
+
         test_end=len(self.df)
         test_x = []
         test_y = []
         j=0
-        for i in range(train_end- timesteps-1,test_end- timesteps-exitTimes):
+        for i in range(train_end - timesteps-exitTimes+1,test_end- timesteps-exitTimes):
+            # print(i)
+            # print(train_end)
+            # print(self.df[train_end - 1])
+            # print(test_end)
+            # print(timesteps)
+            # print(self.df[i + timesteps])
+            # print(train_end)
+            # exit()
             test_x.append(enc.transform(self.df[i:i + timesteps]))
-            test_y.append(self.label(train_end - timesteps-exitTimes+j))
+            test_y.append(self.label2(i + timesteps))
             j+=1
         # print(test_x)
         test_x = np.array(test_x)
