@@ -35,6 +35,7 @@ class StockProcess:
     date=None
     labelDf=[]
     timesteps=None
+    exitTimes=None
     def __init__(self):
         high = pd.read_csv("./data/2003-2021high.csv")
         high = high.loc[:, ~high.columns.str.contains('^Unnamed')]
@@ -143,7 +144,7 @@ class StockProcess:
         ind=i+self.timesteps
         maxPrice=self.df[ind][2]
         minPrice=self.df[ind][3]
-        for index in range(60):
+        for index in range(self.exitTimes):
             if self.df[ind+index][2]>maxPrice:
                 maxPrice=self.df[ind+index][2]
             if self.df[ind + index][3] < minPrice:
@@ -200,8 +201,9 @@ class StockProcess:
             self.moveNext()
         self.df += df
         self.date = date
-    def stockStrategy(self,stockNum,year,timesteps):
+    def stockStrategy(self,stockNum,year,timesteps,exitTimes):
         self.timesteps=timesteps
+        self.exitTimes=exitTimes
 
         stockToken = pd.read_csv("./data/"+stockNum+"token.csv", encoding='big5')
         stockToken = stockToken.loc[:, ~stockToken.columns.str.contains('^Unnamed')]
@@ -247,7 +249,7 @@ class StockProcess:
         # year=int(year)+1
         # self.setDf(stockNum, CurrentDate, year)
 
-        for i in range(train_end - timesteps-60):
+        for i in range(train_end - timesteps-exitTimes):
             train_x.append(enc.transform(self.df[i:i + timesteps]))
             train_y.append(self.label(i))
         train_x = np.array(train_x)
@@ -257,7 +259,8 @@ class StockProcess:
                              num_feat=train_x.shape[2],
                              nb_filters=24,
                              num_classes=0,
-                             kernel_size=8,
+                             kernel_size=20,
+                             kernel_initializer='orthogonal',
                              dilations=[2 ** i for i in range(9)],
                              nb_stacks=1,
                              max_len=train_x.shape[1],
@@ -268,15 +271,15 @@ class StockProcess:
         # print(train_y)
         # print(train_y[:, 0])
         # exit()
-        model.fit(train_x, train_y, batch_size=100, epochs=100)
+        model.fit(train_x, train_y, batch_size=100, epochs=200)
         self.setDf(stockNum, CurrentDate, year)
         test_end=len(self.df)
         test_x = []
         test_y = []
         j=0
-        for i in range(train_end- timesteps-1,test_end- timesteps-60):
+        for i in range(train_end- timesteps-1,test_end- timesteps-exitTimes):
             test_x.append(enc.transform(self.df[i:i + timesteps]))
-            test_y.append(self.label(train_end - timesteps-60+j))
+            test_y.append(self.label(train_end - timesteps-exitTimes+j))
             j+=1
         # print(test_x)
         test_x = np.array(test_x)
@@ -303,7 +306,7 @@ class StockProcess:
         enc.fit(self.df)
         # load('./output/scaler.save')
         # dump(enc, "./output/scaler.save")
-        for i in range(test_end - timesteps - 60):
+        for i in range(test_end - timesteps - exitTimes):
             test_x.append(enc.transform(self.df[i:i + timesteps]))
             test_y.append(self.label(i))
         test_x = np.array(test_x)
@@ -326,4 +329,4 @@ class StockProcess:
         # print(df)
 
 StockProcess=StockProcess()
-StockProcess.stockStrategy(sys.argv[1],sys.argv[2],int(sys.argv[3]))
+StockProcess.stockStrategy(sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]))
