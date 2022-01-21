@@ -13,6 +13,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from joblib import dump, load
 from tcn import compiled_tcn
+import tensorflow as tf
 
 class StockProcess:
     CONST_INIT_DATE = "20040102"
@@ -191,7 +192,12 @@ class StockProcess:
                        float(self.stockTokenBuyCurrent) + float(self.stockTokenSellCurrent),
                        self.highCurrent,
                        self.lowCurrent,
-                       self.volumnCurrent])
+                       self.volumnCurrent,
+                       self.dateCurrent])
+            # df.append([float(self.stockTokenBuyCurrent) ,
+            #            self.highCurrent,
+            #            self.lowCurrent,
+            #            self.volumnCurrent])
             date.append(self.dateCurrent)
             # print(self.dateCurrent)
             if int(self.dateCurrent[0:4]) > int(year) or int(self.dateCurrent) > int(self.CONST_END_DATE):
@@ -255,12 +261,13 @@ class StockProcess:
         train_x = np.array(train_x)
         train_y = np.array(train_y)
 
+        tf.random.set_seed(seed=1)
         model = compiled_tcn(return_sequences=False,
                              num_feat=train_x.shape[2],
                              nb_filters=24,
                              num_classes=0,
                              kernel_size=20,
-                             kernel_initializer='orthogonal',
+                             kernel_initializer='he_normal',
                              dilations=[2 ** i for i in range(9)],
                              nb_stacks=1,
                              max_len=train_x.shape[1],
@@ -268,6 +275,7 @@ class StockProcess:
                              regression=True,
                              dropout_rate=0,
                              output_len=train_y.shape[1])
+        # tf.random.set_seed(seed=1)
         # print(train_y)
         # print(train_y[:, 0])
         # exit()
@@ -288,6 +296,7 @@ class StockProcess:
             print("----------")
             print(y_raw_pred[i])
             print(test_y[i])
+            # exit()
         print("----------")
         print(train_y[len(train_y)-1])
         exit()
