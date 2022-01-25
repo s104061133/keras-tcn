@@ -14,6 +14,7 @@ from sklearn.preprocessing import MinMaxScaler
 from joblib import dump, load
 from tcn import compiled_tcn
 import tensorflow as tf
+from sklearn.model_selection import train_test_split
 
 class StockProcess:
     CONST_INIT_DATE = "20040102"
@@ -283,6 +284,11 @@ class StockProcess:
         train_x = np.array(train_x)
         train_y = np.array(train_y)
 
+        train_x, val_data_x = train_test_split(train_x, random_state=777, train_size=0.8,shuffle=False)
+        train_y, val_data_y = train_test_split(train_y, random_state=777, train_size=0.8,shuffle=False)
+
+        callbacks_list = [PlotLearning()]
+
         tf.random.set_seed(seed=1)
         model = compiled_tcn(return_sequences=False,
                              num_feat=train_x.shape[2],
@@ -301,7 +307,7 @@ class StockProcess:
         # print(train_y)
         # print(train_y[:, 0])
         # exit()
-        model.fit(train_x, train_y, batch_size=100, epochs=200)
+        model.fit(train_x, train_y, batch_size=100, epochs=100,validation_data=(val_data_x, val_data_y),callbacks=callbacks_list)
         year = int(year) + 1
         CurrentDate = self.tradeDateByYear(year)
         self.setDf(stockNum, CurrentDate, year)
